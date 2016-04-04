@@ -35,6 +35,7 @@ use Symfony\Component\Validator\Validation;
  * @author Fabien Potencier <fabien@symfony.com>
  * @author Jeremy Mikola <jmikola@gmail.com>
  * @author Kévin Dunglas <dunglas@gmail.com>
+ * @author Grégoire Pineau <lyrixx@lyrixx.info>
  */
 class FrameworkExtension extends Extension
 {
@@ -123,6 +124,7 @@ class FrameworkExtension extends Extension
         $this->registerTranslatorConfiguration($config['translator'], $container);
         $this->registerProfilerConfiguration($config['profiler'], $container, $loader);
         $this->registerCacheConfiguration($config['cache'], $container, $loader);
+        $this->registerWorkflowConfiguration($config['workflows'], $container, $loader);
 
         if ($this->isConfigEnabled($container, $config['router'])) {
             $this->registerRouterConfiguration($config['router'], $container, $loader);
@@ -337,6 +339,54 @@ class FrameworkExtension extends Extension
 
         if (!$config['collect']) {
             $container->getDefinition('profiler')->addMethodCall('disable', array());
+        }
+    }
+
+    /**
+     * Loads the workflow configuration.
+     *
+     * @param array            $workflows A workflow configuration array
+     * @param ContainerBuilder $container A ContainerBuilder instance
+     * @param XmlFileLoader    $loader    An XmlFileLoader instance
+     */
+    private function registerWorkflowConfiguration(array $workflows, ContainerBuilder $container, XmlFileLoader $loader)
+    {
+        if (!$workflows) {
+            return;
+        }
+
+        $loader->load('workflow.xml');
+
+        $registryDefintion = $container->getDefinition('workflow.registry');
+
+        foreach ($workflows as $name => $workflow) {
+            $definitionDefinition = new Definition('Symfony\Component\Workflow\Definition');
+            $definitionDefinition->addMethodCall('addPlaces', [$workflow['places']]);
+            foreach ($workflow['transitions'] as $transitionName => $transition) {
+                $definitionDefinition->addMethodCall('addTransition', [new Definition('Symfony\Component\Workflow\Transition', [$transitionName, $transition['from'], $transition['to']])]);
+            }
+
+            if (isset($workflow['marking_store']['type'])) {
+                $markingStoreDefinition = new DefinitionDecorator('workflow.marking_store.'.$workflow['marking_store']['type']);
+                foreach ($workflow['marking_store']['arguments'] as $argument) {
+                    $markingStoreDefinition->addArgument($argument);
+                }
+            } else {
+                $markingStoreDefinition = new Reference($workflow['marking_store']['service']);
+            }
+
+            $workflowDefinition = new DefinitionDecorator('workflow.abstract');
+            $workflowDefinition->replaceArgument(0, $definitionDefinition);
+            $workflowDefinition->replaceArgument(1, $markingStoreDefinition);
+            $workflowDefinition->replaceArgument(3, $name);
+
+            $workflowId = 'workflow.'.$name;
+
+            $container->setDefinition($workflowId, $workflowDefinition);
+
+            foreach ($workflow['supports'] as $supportedClass) {
+                $registryDefintion->addMethodCall('add', [new Reference($workflowId), $supportedClass]);
+            }
         }
     }
 

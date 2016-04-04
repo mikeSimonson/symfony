@@ -268,6 +268,7 @@ class ConfigurationTest extends \PHPUnit_Framework_TestCase
             'cache' => array(
                 'pools' => array(),
             ),
+            'workflows' => array(),
         );
     }
 }
