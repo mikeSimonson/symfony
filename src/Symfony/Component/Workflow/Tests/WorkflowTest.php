@@ -136,9 +136,9 @@ class WorkflowTest extends \PHPUnit_Framework_TestCase
         $definition = $this->createComplexWorkflow();
         $subject = new \stdClass();
         $subject->marking = null;
-        $ed = new EventDispatcher();
-        $ed->addListener('workflow.workflow_name.guard.t1', function (GuardEvent $event) { $event->setBlocked(true); });
-        $workflow = new Workflow($definition, new PropertyAccessorMarkingStore(), $ed, 'workflow_name');
+        $eventDispatcher = new EventDispatcher();
+        $eventDispatcher->addListener('workflow.workflow_name.guard.t1', function (GuardEvent $event) { $event->setBlocked(true); });
+        $workflow = new Workflow($definition, new PropertyAccessorMarkingStore(), $eventDispatcher, 'workflow_name');
 
         $this->assertFalse($workflow->can($subject, 't1'));
     }
@@ -177,8 +177,11 @@ class WorkflowTest extends \PHPUnit_Framework_TestCase
         $definition = $this->createComplexWorkflow();
         $subject = new \stdClass();
         $subject->marking = null;
-        $ed = new EventDispatcher();
-        $eventNames = [
+        $eventDispatcher = new EventDispatcherMock();
+        $workflow = new Workflow($definition, new PropertyAccessorMarkingStore(), $eventDispatcher, 'workflow_name');
+
+        $eventNameExpected = [
+            'workflow.guard',
             'workflow.workflow_name.guard',
             'workflow.workflow_name.guard.t1',
             'workflow.leave',
@@ -191,40 +194,37 @@ class WorkflowTest extends \PHPUnit_Framework_TestCase
             'workflow.workflow_name.enter',
             'workflow.workflow_name.enter.b',
             'workflow.workflow_name.enter.c',
+            // Following events are fired because of announce() method
+            'workflow.guard',
+            'workflow.workflow_name.guard',
+            'workflow.workflow_name.guard.t2',
+            'workflow.workflow_name.announce.t2',
         ];
-        $eventNameExpected = $eventNames;
-        $callback = function (Event $event, $eventName) use (&$eventNames) {
-            $eventNames[] = $eventName;
-        };
-        foreach ($eventNames as $eventName => $called) {
-            $ed->addListener($eventName, $callback);
-        }
-        $workflow = new Workflow($definition, new PropertyAccessorMarkingStore(), $ed, 'workflow_name');
 
         $marking = $workflow->apply($subject, 't1');
 
-        $this->assertSame($eventNameExpected, $eventNames);
+        $this->assertSame($eventNameExpected, $eventDispatcher->dispatchedEvents);
     }
 
-    public function testGetAvailableTransitions()
+    public function testGetEnabledTransitions()
     {
         $definition = $this->createComplexWorkflow();
         $subject = new \stdClass();
         $subject->marking = null;
-        $ed = new EventDispatcher();
-        $ed->addListener('workflow.workflow_name.guard.t1', function (GuardEvent $event) { $event->setBlocked(true); });
-        $workflow = new Workflow($definition, new PropertyAccessorMarkingStore(), $ed, 'workflow_name');
+        $eventDispatcher = new EventDispatcher();
+        $eventDispatcher->addListener('workflow.workflow_name.guard.t1', function (GuardEvent $event) { $event->setBlocked(true); });
+        $workflow = new Workflow($definition, new PropertyAccessorMarkingStore(), $eventDispatcher, 'workflow_name');
 
-        $this->assertEmpty($workflow->getAvailableTransitions($subject));
+        $this->assertEmpty($workflow->getEnabledTransitions($subject));
 
         $subject->marking = ['d' => true];
-        $transitions = $workflow->getAvailableTransitions($subject);
+        $transitions = $workflow->getEnabledTransitions($subject);
         $this->assertCount(2, $transitions);
         $this->assertSame('t3', $transitions['t3']->getName());
         $this->assertSame('t4', $transitions['t4']->getName());
 
         $subject->marking = ['c' => true, 'e' => true];
-        $transitions = $workflow->getAvailableTransitions($subject);
+        $transitions = $workflow->getEnabledTransitions($subject);
         $this->assertCount(1, $transitions);
         $this->assertSame('t5', $transitions['t5']->getName());
     }
@@ -256,4 +256,23 @@ class WorkflowTest extends \PHPUnit_Framework_TestCase
         //           | b  | ----------------+        | t3 | --> | e  | --> | t5 | -----------------+
         //           +----+                          +----+     +----+     +----+
     }
+}
+
+
+class EventDispatcherMock implements \Symfony\Component\EventDispatcher\EventDispatcherInterface
+{
+    public $dispatchedEvents = [];
+
+    public function dispatch($eventName, \Symfony\Component\EventDispatcher\Event $event = null)
+    {
+        $this->dispatchedEvents[] = $eventName;
+    }
+
+    public function addListener($eventName, $listener, $priority = 0) {}
+    public function addSubscriber(\Symfony\Component\EventDispatcher\EventSubscriberInterface $subscriber) {}
+    public function removeListener($eventName, $listener) {}
+    public function removeSubscriber(\Symfony\Component\EventDispatcher\EventSubscriberInterface $subscriber) {}
+    public function getListeners($eventName = null) {}
+    public function getListenerPriority($eventName, $listener) {}
+    public function hasListeners($eventName = null) {}
 }

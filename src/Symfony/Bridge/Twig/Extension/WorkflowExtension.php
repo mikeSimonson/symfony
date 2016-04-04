@@ -31,7 +31,7 @@ class WorkflowExtension extends \Twig_Extension
     {
         return array(
             new \Twig_SimpleFunction('workflow_can', [$this, 'canTransition']),
-            new \Twig_SimpleFunction('workflow_available_transitions', [$this, 'getAvailableTransitions']),
+            new \Twig_SimpleFunction('workflow_enabled_transitions', [$this, 'getEnabledTransitions']),
         );
     }
 
@@ -40,9 +40,9 @@ class WorkflowExtension extends \Twig_Extension
         return $this->workflowRegistry->get($object, $name)->can($object, $transition);
     }
 
-    public function getAvailableTransitions($object, $name = null)
+    public function getEnabledTransitions($object, $name = null)
     {
-        return $this->workflowRegistry->get($object, $name)->getAvailableTransitions($object);
+        return $this->workflowRegistry->get($object, $name)->getEnabledTransitions($object);
     }
 
     public function getName()

@@ -89,12 +89,12 @@ class Workflow
     }
 
     /**
-     * Returns true if the transition is applicable.
+     * Returns true if the transition is enabled.
      *
      * @param object $subject        A subject
      * @param string $transitionName A transition
      *
-     * @return bool true if the transition is applicable
+     * @return bool true if the transition is enabled
      *
      * @throws LogicException If the transition does not exist
      */
@@ -106,15 +106,15 @@ class Workflow
             throw new LogicException(sprintf('Transition "%s" does not exist for workflow "%s".', $transitionName, $this->name));
         }
 
-        $transition = $transitions[$transitionName];
-
         $marking = $this->getMarking($subject);
+
+        $transition = $transitions[$transitionName];
 
         return $this->doCan($subject, $marking, $transition);
     }
 
     /**
-     * Enable a transition.
+     * fire a transition.
      *
      * @param object $subject        A subject
      * @param string $transitionName A transition
@@ -130,7 +130,9 @@ class Workflow
             throw new LogicException(sprintf('Unable to apply transition "%s" for workflow "%s".', $transitionName, $this->name));
         }
 
-        $marking = $this->getMarking($subject);
+        // We can shortcut the getMarking method in order to boost performance,
+        // since the can method already check the Marking state
+        $marking = $this->markingStore->getMarking($subject);
 
         $transition = $this->definition->getTransitions()[$transitionName];
 
@@ -140,31 +142,33 @@ class Workflow
 
         $this->enter($subject, $transition, $marking);
 
+        $this->announce($subject, $transition, $marking);
+
         $this->markingStore->setMarking($subject, $marking);
 
         return $marking;
     }
 
     /**
-     * Returns all available transitions.
+     * Returns all enabled transitions.
      *
      * @param object $subject A subject
      *
-     * @return Transition[] All available transitions
+     * @return Transition[] All enabled transitions
      */
-    public function getAvailableTransitions($subject)
+    public function getEnabledTransitions($subject)
     {
-        $availables = array();
+        $enabled = array();
 
         $marking = $this->getMarking($subject);
 
         foreach ($this->definition->getTransitions() as $transition) {
             if ($this->doCan($subject, $marking, $transition)) {
-                $availables[$transition->getName()] = $transition;
+                $enabled[$transition->getName()] = $transition;
             }
         }
 
-        return $availables;
+        return $enabled;
     }
 
     public function getName()
@@ -205,15 +209,17 @@ class Workflow
     private function leave($subject, Transition $transition, Marking $marking)
     {
         if (null !== $this->dispatcher) {
-            $this->dispatcher->dispatch('workflow.leave', new Event($subject, $marking, $transition));
-            $this->dispatcher->dispatch(sprintf('workflow.%s.leave', $this->name), new Event($subject, $marking, $transition));
+            $event = new Event($subject, $marking, $transition);
+
+            $this->dispatcher->dispatch('workflow.leave', $event);
+            $this->dispatcher->dispatch(sprintf('workflow.%s.leave', $this->name), $event);
         }
 
         foreach ($transition->getFroms() as $place) {
             $marking->unmark($place);
 
             if (null !== $this->dispatcher) {
-                $this->dispatcher->dispatch(sprintf('workflow.%s.leave.%s', $this->name, $place), new Event($subject, $marking, $transition));
+                $this->dispatcher->dispatch(sprintf('workflow.%s.leave.%s', $this->name, $place), $event);
             }
         }
     }
@@ -224,23 +230,42 @@ class Workflow
             return;
         }
 
-        $this->dispatcher->dispatch('workflow.transition', new Event($subject, $marking, $transition));
-        $this->dispatcher->dispatch(sprintf('workflow.%s.transition', $this->name), new Event($subject, $marking, $transition));
-        $this->dispatcher->dispatch(sprintf('workflow.%s.transition.%s', $this->name, $transition->getName()), new Event($subject, $marking, $transition));
+        $event = new Event($subject, $marking, $transition);
+
+        $this->dispatcher->dispatch('workflow.transition', $event);
+        $this->dispatcher->dispatch(sprintf('workflow.%s.transition', $this->name), $event);
+        $this->dispatcher->dispatch(sprintf('workflow.%s.transition.%s', $this->name, $transition->getName()), $event);
     }
 
     private function enter($subject, Transition $transition, Marking $marking)
     {
         if (null !== $this->dispatcher) {
-            $this->dispatcher->dispatch('workflow.enter', new Event($subject, $marking, $transition));
-            $this->dispatcher->dispatch(sprintf('workflow.%s.enter', $this->name), new Event($subject, $marking, $transition));
+            $event = new Event($subject, $marking, $transition);
+
+            $this->dispatcher->dispatch('workflow.enter', $event);
+            $this->dispatcher->dispatch(sprintf('workflow.%s.enter', $this->name), $event);
         }
 
         foreach ($transition->getTos() as $place) {
             $marking->mark($place);
 
             if (null !== $this->dispatcher) {
-                $this->dispatcher->dispatch(sprintf('workflow.%s.enter.%s', $this->name, $place), new Event($subject, $marking, $transition));
+                $this->dispatcher->dispatch(sprintf('workflow.%s.enter.%s', $this->name, $place), $event);
+            }
+        }
+    }
+
+    private function announce($subject, Transition $initialTransition, Marking $marking)
+    {
+        if (null === $this->dispatcher) {
+            return;
+        }
+
+        $event = new Event($subject, $marking, $initialTransition);
+
+        foreach ($this->definition->getTransitions() as $transition) {
+            if ($this->doCan($subject, $marking, $transition)) {
+                $this->dispatcher->dispatch(sprintf('workflow.%s.announce.%s', $this->name, $transition->getName()), $event);
             }
         }
     }

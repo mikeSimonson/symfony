@@ -7,6 +7,16 @@ use Symfony\Component\Workflow\Transition;
 
 class DefinitionTest extends \PHPUnit_Framework_TestCase
 {
+    /**
+     * @expectedException Symfony\Component\Workflow\Exception\InvalidArgumentException
+     * @expectedExceptionMessage The place "foo.bar" contains invalid characters.
+     */
+    public function testValidateName()
+    {
+        $definition = new Definition();
+        $definition->addPlace('foo.bar');
+    }
+
     public function testAddPlaces()
     {
         $definition = new Definition();
