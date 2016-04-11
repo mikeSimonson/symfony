@@ -11,6 +11,7 @@
 
 namespace Symfony\Component\Workflow;
 
+use Symfony\Component\Workflow\Exception\InvalidArgumentException;
 use Symfony\Component\Workflow\Exception\LogicException;
 
 /**
@@ -49,6 +50,10 @@ class Definition
 
     public function addPlace($name)
     {
+        if (!preg_match('{^[\w\d_-]+$}', $name)) {
+            throw new InvalidArgumentException(sprintf('The place "%s" contains invalid characters.', $name));
+        }
+
         if (!count($this->places)) {
             $this->initialPlace = $name;
         }
