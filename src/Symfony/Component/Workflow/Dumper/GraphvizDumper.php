@@ -97,7 +97,7 @@ class GraphvizDumper implements DumperInterface
     {
         $transitions = array();
 
-        foreach ($definition->getTransitions() as $name => $nbToken) {
+        foreach ($definition->getTransitions() as $name => $transition) {
             $transitions[$name] = array(
                 'attributes' => array('shape' => 'box', 'regular' => true),
             );
