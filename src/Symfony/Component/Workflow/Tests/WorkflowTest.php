@@ -206,7 +206,7 @@ class WorkflowTest extends \PHPUnit_Framework_TestCase
         $this->assertSame($eventNameExpected, $eventNames);
     }
 
-    public function testGetAvailableTransitions()
+    public function testGetEnabledTransitions()
     {
         $definition = $this->createComplexWorkflow();
         $subject = new \stdClass();
@@ -215,16 +215,16 @@ class WorkflowTest extends \PHPUnit_Framework_TestCase
         $ed->addListener('workflow.workflow_name.guard.t1', function (GuardEvent $event) { $event->setBlocked(true); });
         $workflow = new Workflow($definition, new PropertyAccessorMarkingStore(), $ed, 'workflow_name');
 
-        $this->assertEmpty($workflow->getAvailableTransitions($subject));
+        $this->assertEmpty($workflow->getEnabledTransitions($subject));
 
         $subject->marking = ['d' => true];
-        $transitions = $workflow->getAvailableTransitions($subject);
+        $transitions = $workflow->getEnabledTransitions($subject);
         $this->assertCount(2, $transitions);
         $this->assertSame('t3', $transitions['t3']->getName());
         $this->assertSame('t4', $transitions['t4']->getName());
 
         $subject->marking = ['c' => true, 'e' => true];
-        $transitions = $workflow->getAvailableTransitions($subject);
+        $transitions = $workflow->getEnabledTransitions($subject);
         $this->assertCount(1, $transitions);
         $this->assertSame('t5', $transitions['t5']->getName());
     }

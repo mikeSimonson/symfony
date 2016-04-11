@@ -89,12 +89,12 @@ class Workflow
     }
 
     /**
-     * Returns true if the transition is applicable.
+     * Returns true if the transition is enabled.
      *
      * @param object $subject        A subject
      * @param string $transitionName A transition
      *
-     * @return bool true if the transition is applicable
+     * @return bool true if the transition is enabled
      *
      * @throws LogicException If the transition does not exist
      */
@@ -114,7 +114,7 @@ class Workflow
     }
 
     /**
-     * Enable a transition.
+     * fire a transition.
      *
      * @param object $subject        A subject
      * @param string $transitionName A transition
@@ -146,25 +146,25 @@ class Workflow
     }
 
     /**
-     * Returns all available transitions.
+     * Returns all enabled transitions.
      *
      * @param object $subject A subject
      *
-     * @return Transition[] All available transitions
+     * @return Transition[] All enabled transitions
      */
-    public function getAvailableTransitions($subject)
+    public function getEnabledTransitions($subject)
     {
-        $availables = array();
+        $enabled = array();
 
         $marking = $this->getMarking($subject);
 
         foreach ($this->definition->getTransitions() as $transition) {
             if ($this->doCan($subject, $marking, $transition)) {
-                $availables[$transition->getName()] = $transition;
+                $enabled[$transition->getName()] = $transition;
             }
         }
 
-        return $availables;
+        return $enabled;
     }
 
     public function getName()
