@@ -106,9 +106,9 @@ class Workflow
             throw new LogicException(sprintf('Transition "%s" does not exist for workflow "%s".', $transitionName, $this->name));
         }
 
-        $transition = $transitions[$transitionName];
-
         $marking = $this->getMarking($subject);
+
+        $transition = $transitions[$transitionName];
 
         return $this->doCan($subject, $marking, $transition);
     }
@@ -130,7 +130,9 @@ class Workflow
             throw new LogicException(sprintf('Unable to apply transition "%s" for workflow "%s".', $transitionName, $this->name));
         }
 
-        $marking = $this->getMarking($subject);
+        // We can shortcut the getMarking method in order to boost performance,
+        // since the can method already check the Marking state
+        $marking = $this->markingStore->getMarking($subject);
 
         $transition = $this->definition->getTransitions()[$transitionName];
 
@@ -207,15 +209,17 @@ class Workflow
     private function leave($subject, Transition $transition, Marking $marking)
     {
         if (null !== $this->dispatcher) {
-            $this->dispatcher->dispatch('workflow.leave', new Event($subject, $marking, $transition));
-            $this->dispatcher->dispatch(sprintf('workflow.%s.leave', $this->name), new Event($subject, $marking, $transition));
+            $event = new Event($subject, $marking, $transition);
+
+            $this->dispatcher->dispatch('workflow.leave', $event);
+            $this->dispatcher->dispatch(sprintf('workflow.%s.leave', $this->name), $event);
         }
 
         foreach ($transition->getFroms() as $place) {
             $marking->unmark($place);
 
             if (null !== $this->dispatcher) {
-                $this->dispatcher->dispatch(sprintf('workflow.%s.leave.%s', $this->name, $place), new Event($subject, $marking, $transition));
+                $this->dispatcher->dispatch(sprintf('workflow.%s.leave.%s', $this->name, $place), $event);
             }
         }
     }
@@ -226,23 +230,27 @@ class Workflow
             return;
         }
 
-        $this->dispatcher->dispatch('workflow.transition', new Event($subject, $marking, $transition));
-        $this->dispatcher->dispatch(sprintf('workflow.%s.transition', $this->name), new Event($subject, $marking, $transition));
-        $this->dispatcher->dispatch(sprintf('workflow.%s.transition.%s', $this->name, $transition->getName()), new Event($subject, $marking, $transition));
+        $event = new Event($subject, $marking, $transition);
+
+        $this->dispatcher->dispatch('workflow.transition', $event);
+        $this->dispatcher->dispatch(sprintf('workflow.%s.transition', $this->name), $event);
+        $this->dispatcher->dispatch(sprintf('workflow.%s.transition.%s', $this->name, $transition->getName()), $event);
     }
 
     private function enter($subject, Transition $transition, Marking $marking)
     {
         if (null !== $this->dispatcher) {
-            $this->dispatcher->dispatch('workflow.enter', new Event($subject, $marking, $transition));
-            $this->dispatcher->dispatch(sprintf('workflow.%s.enter', $this->name), new Event($subject, $marking, $transition));
+            $event = new Event($subject, $marking, $transition);
+
+            $this->dispatcher->dispatch('workflow.enter', $event);
+            $this->dispatcher->dispatch(sprintf('workflow.%s.enter', $this->name), $event);
         }
 
         foreach ($transition->getTos() as $place) {
             $marking->mark($place);
 
             if (null !== $this->dispatcher) {
-                $this->dispatcher->dispatch(sprintf('workflow.%s.enter.%s', $this->name, $place), new Event($subject, $marking, $transition));
+                $this->dispatcher->dispatch(sprintf('workflow.%s.enter.%s', $this->name, $place), $event);
             }
         }
     }
@@ -253,9 +261,11 @@ class Workflow
             return;
         }
 
+        $event = new Event($subject, $marking, $initialTransition);
+
         foreach ($this->definition->getTransitions() as $transition) {
             if ($this->doCan($subject, $marking, $transition)) {
-                $this->dispatcher->dispatch(sprintf('workflow.%s.announce.%s', $this->name, $transition->getName()), new Event($subject, $marking, $initialTransition));
+                $this->dispatcher->dispatch(sprintf('workflow.%s.announce.%s', $this->name, $transition->getName()), $event);
             }
         }
     }
