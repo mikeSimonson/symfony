@@ -177,13 +177,8 @@ class WorkflowTest extends \PHPUnit_Framework_TestCase
         $definition = $this->createComplexWorkflow();
         $subject = new \stdClass();
         $subject->marking = null;
-        $eventDispatcher = new EventDispatcher();
+        $eventDispatcher = new EventDispatcherMock();
         $workflow = new Workflow($definition, new PropertyAccessorMarkingStore(), $eventDispatcher, 'workflow_name');
-
-        $eventNames = [];
-        $callback = function (Event $event, $eventName) use (&$eventNames) {
-            $eventNames[] = $eventName;
-        };
 
         $eventNameExpected = [
             'workflow.guard',
@@ -199,19 +194,16 @@ class WorkflowTest extends \PHPUnit_Framework_TestCase
             'workflow.workflow_name.enter',
             'workflow.workflow_name.enter.b',
             'workflow.workflow_name.enter.c',
+            // Following events are fired because of announce() method
+            'workflow.guard',
+            'workflow.workflow_name.guard',
+            'workflow.workflow_name.guard.t2',
             'workflow.workflow_name.announce.t2',
         ];
 
-        foreach ($eventNameExpected as $eventName) {
-            $eventDispatcher->addListener($eventName, $callback);
-        }
-
         $marking = $workflow->apply($subject, 't1');
 
-        // We don't test multiple events
-        $eventNames = array_values(array_unique($eventNames));
-
-        $this->assertSame($eventNameExpected, $eventNames);
+        $this->assertSame($eventNameExpected, $eventDispatcher->dispatchedEvents);
     }
 
     public function testGetEnabledTransitions()
@@ -264,4 +256,23 @@ class WorkflowTest extends \PHPUnit_Framework_TestCase
         //           | b  | ----------------+        | t3 | --> | e  | --> | t5 | -----------------+
         //           +----+                          +----+     +----+     +----+
     }
+}
+
+
+class EventDispatcherMock implements \Symfony\Component\EventDispatcher\EventDispatcherInterface
+{
+    public $dispatchedEvents = [];
+
+    public function dispatch($eventName, \Symfony\Component\EventDispatcher\Event $event = null)
+    {
+        $this->dispatchedEvents[] = $eventName;
+    }
+
+    public function addListener($eventName, $listener, $priority = 0) {}
+    public function addSubscriber(\Symfony\Component\EventDispatcher\EventSubscriberInterface $subscriber) {}
+    public function removeListener($eventName, $listener) {}
+    public function removeSubscriber(\Symfony\Component\EventDispatcher\EventSubscriberInterface $subscriber) {}
+    public function getListeners($eventName = null) {}
+    public function getListenerPriority($eventName, $listener) {}
+    public function hasListeners($eventName = null) {}
 }
