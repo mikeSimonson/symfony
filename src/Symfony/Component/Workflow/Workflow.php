@@ -52,6 +52,8 @@ class Workflow
      * @param object $subject A subject
      *
      * @return Marking The Marking
+     *
+     * @throws LogicException
      */
     public function getMarking($subject)
     {
