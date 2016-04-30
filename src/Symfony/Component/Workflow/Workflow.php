@@ -71,9 +71,9 @@ class Workflow
 
         // check that the subject has a known place
         $places = $this->definition->getPlaces();
-        foreach ($marking->getPlaces() as $place => $nbToken) {
-            if (!isset($places[$place])) {
-                $message = sprintf('Place "%s" is not valid for workflow "%s".', $place, $this->name);
+        foreach ($marking->getPlaces() as $placeName => $nbToken) {
+            if (!isset($places[$placeName])) {
+                $message = sprintf('Place "%s" is not valid for workflow "%s".', $placeName, $this->name);
                 if (!$places) {
                     $message .= ' It seems you forgot to add places to the current workflow.';
                 }
