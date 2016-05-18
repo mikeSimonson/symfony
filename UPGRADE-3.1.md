@@ -19,6 +19,30 @@ Form
  * Support for data objects that implements both `Traversable` and `ArrayAccess`
    in `ResizeFormListener::preSubmit` method has been deprecated and will be
    removed in Symfony 4.0.
+ * `TextType` now implements `DataTransformerInterface` and will always return
+   an empty string when `empty_data` option is explicitly assigned to it.
+
+ * Using callable strings as choice options in ChoiceType has been deprecated
+   in favor of `PropertyPath` in Symfony 4.0 use a "\Closure" instead.
+
+   Before:
+
+   ```php
+   'choice_value' => new PropertyPath('range'),
+   'choice_label' => 'strtoupper',
+   ```
+
+   After:
+
+   ```php
+   'choice_value' => 'range',
+   'choice_label' => function ($choice) {
+       return strtoupper($choice);
+   },
+   ```
+
+ * Caching of the loaded `ChoiceListInterface` in the `LazyChoiceList` has been deprecated,
+   it must be cached in the `ChoiceLoaderInterface` implementation instead.
 
 FrameworkBundle
 ---------------
@@ -63,6 +87,14 @@ FrameworkBundle
     - `"form.type.button"`
     - `"form.type.submit"`
     - `"form.type.reset"`
+
+ * The service `serializer.mapping.cache.apc`  has been deprecated in favor of
+   `serializer.mapping.cache.doctrine.apc` to be consistent with the validator
+   cache service. If you are using `serializer.mapping.cache.apc`, use
+   `serializer.mapping.cache.doctrine.apc` instead.
+
+ * The `framework.serializer.cache` option has been deprecated. APCu should now
+   be automatically used when available so you can remove this configuration key.
 
 HttpKernel
 ----------

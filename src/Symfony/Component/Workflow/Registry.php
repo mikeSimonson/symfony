@@ -26,7 +26,7 @@ class Registry
 
     /**
      * @param Workflow $workflow
-     * @param string $classname
+     * @param string   $classname
      */
     public function add(Workflow $workflow, $classname)
     {
@@ -34,8 +34,9 @@ class Registry
     }
 
     /**
-     * @param string $subject
+     * @param string      $subject
      * @param string|null $name
+     *
      * @return Workflow
      */
     public function get($subject, $name = null)
@@ -59,9 +60,10 @@ class Registry
 
     /**
      * @param Workflow $workflow
-     * @param string $classname
-     * @param string $subject
-     * @param string $name
+     * @param string   $classname
+     * @param string   $subject
+     * @param string   $name
+     *
      * @return bool
      */
     private function supports(Workflow $workflow, $classname, $subject, $name)

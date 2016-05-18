@@ -36,11 +36,36 @@ class ApcuAdapterTest extends CachePoolTest
         $pool = $this->createCachePool();
 
         $item = $pool->getItem('foo');
-        $item->set(function() {});
+        $item->set(function () {});
 
         $this->assertFalse($pool->save($item));
 
         $item = $pool->getItem('foo');
         $this->assertFalse($item->isHit());
+    }
+
+    public function testNonce()
+    {
+        $namespace = str_replace('\\', '.', __CLASS__);
+
+        $pool1 = new ApcuAdapter($namespace, 0, 'p1');
+
+        $item = $pool1->getItem('foo');
+        $this->assertFalse($item->isHit());
+        $this->assertTrue($pool1->save($item->set('bar')));
+
+        $item = $pool1->getItem('foo');
+        $this->assertTrue($item->isHit());
+        $this->assertSame('bar', $item->get());
+
+        $pool2 = new ApcuAdapter($namespace, 0, 'p2');
+
+        $item = $pool2->getItem('foo');
+        $this->assertFalse($item->isHit());
+        $this->assertNull($item->get());
+
+        $item = $pool1->getItem('foo');
+        $this->assertFalse($item->isHit());
+        $this->assertNull($item->get());
     }
 }

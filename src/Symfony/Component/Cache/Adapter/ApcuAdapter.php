@@ -11,6 +11,7 @@
 
 namespace Symfony\Component\Cache\Adapter;
 
+use Symfony\Component\Cache\CacheItem;
 use Symfony\Component\Cache\Exception\CacheException;
 
 /**
@@ -18,15 +19,29 @@ use Symfony\Component\Cache\Exception\CacheException;
  */
 class ApcuAdapter extends AbstractAdapter
 {
-    public function __construct($namespace = '', $defaultLifetime = 0)
+    public static function isSupported()
     {
-        if (!function_exists('apcu_fetch') || !ini_get('apc.enabled') || ('cli' === PHP_SAPI && !ini_get('apc.enable_cli'))) {
+        return function_exists('apcu_fetch') && ini_get('apc.enabled') && !('cli' === PHP_SAPI && !ini_get('apc.enable_cli'));
+    }
+
+    public function __construct($namespace = '', $defaultLifetime = 0, $nonce = null)
+    {
+        if (!static::isSupported()) {
             throw new CacheException('APCu is not enabled');
         }
         if ('cli' === PHP_SAPI) {
             ini_set('apc.use_request_time', 0);
         }
         parent::__construct($namespace, $defaultLifetime);
+
+        if (null !== $nonce) {
+            CacheItem::validateKey($nonce);
+
+            if (!apcu_exists($nonce.':nonce'.$namespace)) {
+                $this->clear($namespace);
+                apcu_add($nonce.':nonce'.$namespace, null);
+            }
+        }
     }
 
     /**

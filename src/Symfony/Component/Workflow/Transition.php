@@ -36,7 +36,8 @@ class Transition
 
     /**
      * Transition constructor.
-     * @param string $name
+     *
+     * @param string        $name
      * @param Place|Place[] $froms
      * @param Place|Place[] $tos
      */
@@ -45,7 +46,7 @@ class Transition
         if (!preg_match('{^[\w\d_-]+$}', $name)) {
             throw new InvalidArgumentException(sprintf('The transition "%s" contains invalid characters.', $name));
         }
-        
+
         if (!is_array($froms)) {
             $froms = [$froms];
         }

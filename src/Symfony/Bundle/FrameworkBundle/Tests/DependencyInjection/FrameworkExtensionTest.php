@@ -14,8 +14,11 @@ namespace Symfony\Bundle\FrameworkBundle\Tests\DependencyInjection;
 use Symfony\Bundle\FrameworkBundle\Tests\TestCase;
 use Symfony\Bundle\FrameworkBundle\DependencyInjection\FrameworkExtension;
 use Symfony\Component\Cache\Adapter\ApcuAdapter;
+use Symfony\Component\Cache\Adapter\ChainAdapter;
 use Symfony\Component\Cache\Adapter\DoctrineAdapter;
 use Symfony\Component\Cache\Adapter\FilesystemAdapter;
+use Symfony\Component\Cache\Adapter\ProxyAdapter;
+use Symfony\Component\Cache\Adapter\RedisAdapter;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\DefinitionDecorator;
 use Symfony\Component\DependencyInjection\Loader\ClosureLoader;
@@ -330,7 +333,7 @@ abstract class FrameworkExtensionTest extends TestCase
 
     public function testValidationService()
     {
-        $container = $this->createContainerFromFile('validation_annotations');
+        $container = $this->createContainerFromFile('validation_annotations', array('kernel.charset' => 'UTF-8'), false);
 
         $this->assertInstanceOf('Symfony\Component\Validator\Validator\ValidatorInterface', $container->get('validator'));
     }
@@ -357,11 +360,13 @@ abstract class FrameworkExtensionTest extends TestCase
 
         $calls = $container->getDefinition('validator.builder')->getMethodCalls();
 
-        $this->assertCount(6, $calls);
+        $this->assertCount(7, $calls);
         $this->assertSame('enableAnnotationMapping', $calls[4][0]);
         $this->assertEquals(array(new Reference('annotation_reader')), $calls[4][1]);
         $this->assertSame('addMethodMapping', $calls[5][0]);
         $this->assertSame(array('loadValidatorMetadata'), $calls[5][1]);
+        $this->assertSame('setMetadataCache', $calls[6][0]);
+        $this->assertEquals(array(new Reference('validator.mapping.cache.symfony')), $calls[6][1]);
         // no cache this time
     }
 
@@ -375,12 +380,14 @@ abstract class FrameworkExtensionTest extends TestCase
 
         $calls = $container->getDefinition('validator.builder')->getMethodCalls();
 
-        $this->assertCount(7, $calls);
+        $this->assertCount(8, $calls);
         $this->assertSame('addXmlMappings', $calls[3][0]);
         $this->assertSame('addYamlMappings', $calls[4][0]);
         $this->assertSame('enableAnnotationMapping', $calls[5][0]);
         $this->assertSame('addMethodMapping', $calls[6][0]);
         $this->assertSame(array('loadValidatorMetadata'), $calls[6][1]);
+        $this->assertSame('setMetadataCache', $calls[7][0]);
+        $this->assertEquals(array(new Reference('validator.mapping.cache.symfony')), $calls[7][1]);
 
         $xmlMappings = $calls[3][1][0];
         $this->assertCount(2, $xmlMappings);
@@ -404,8 +411,10 @@ abstract class FrameworkExtensionTest extends TestCase
 
         $calls = $container->getDefinition('validator.builder')->getMethodCalls();
 
-        $this->assertCount(4, $calls);
+        $this->assertCount(5, $calls);
         $this->assertSame('addXmlMappings', $calls[3][0]);
+        $this->assertSame('setMetadataCache', $calls[4][0]);
+        $this->assertEquals(array(new Reference('validator.mapping.cache.symfony')), $calls[4][1]);
         // no cache, no annotations, no static methods
     }
 
@@ -450,7 +459,7 @@ abstract class FrameworkExtensionTest extends TestCase
 
         $this->assertCount(1, $argument);
         $this->assertEquals('Symfony\Component\Serializer\Mapping\Loader\AnnotationLoader', $argument[0]->getClass());
-        $this->assertEquals(new Reference('serializer.mapping.cache.apc'), $container->getDefinition('serializer.mapping.class_metadata_factory')->getArgument(1));
+        $this->assertNull($container->getDefinition('serializer.mapping.class_metadata_factory')->getArgument(1));
         $this->assertEquals(new Reference('serializer.name_converter.camel_case_to_snake_case'), $container->getDefinition('serializer.normalizer.object')->getArgument(1));
     }
 
@@ -522,6 +531,44 @@ abstract class FrameworkExtensionTest extends TestCase
         $this->assertEquals(-1000, $tag[0]['priority']);
     }
 
+    public function testSerializerCacheActivated()
+    {
+        $container = $this->createContainerFromFile('serializer_enabled');
+        $this->assertTrue($container->hasDefinition('serializer.mapping.cache_class_metadata_factory'));
+    }
+
+    public function testSerializerCacheDisabled()
+    {
+        $container = $this->createContainerFromFile('serializer_enabled', array('kernel.debug' => true, 'kernel.container_class' => __CLASS__));
+        $this->assertFalse($container->hasDefinition('serializer.mapping.cache_class_metadata_factory'));
+    }
+
+    /**
+     * @group legacy
+     */
+    public function testDeprecatedSerializerCacheOption()
+    {
+        $deprecations = array();
+        set_error_handler(function ($type, $msg) use (&$deprecations) {
+            if (E_USER_DEPRECATED !== $type) {
+                restore_error_handler();
+
+                return call_user_func_array('PHPUnit_Util_ErrorHandler::handleError', func_get_args());
+            }
+
+            $deprecations[] = $msg;
+        });
+
+        $container = $this->createContainerFromFile('serializer_legacy_cache', array('kernel.debug' => true, 'kernel.container_class' => __CLASS__));
+
+        restore_error_handler();
+
+        $this->assertCount(1, $deprecations);
+        $this->assertContains('The "framework.serializer.cache" option is deprecated', $deprecations[0]);
+        $this->assertFalse($container->hasDefinition('serializer.mapping.cache_class_metadata_factory'));
+        $this->assertEquals(new Reference('foo'), $container->getDefinition('serializer.mapping.class_metadata_factory')->getArgument(1));
+    }
+
     public function testAssetHelperWhenAssetsAreEnabled()
     {
         $container = $this->createContainerFromFile('full');
@@ -582,11 +629,11 @@ abstract class FrameworkExtensionTest extends TestCase
     {
         $container = $this->createContainerFromFile('cache');
 
-        $this->assertCachePoolServiceDefinitionIsCreated($container, 'foo', 'cache.adapter.apcu', 30);
-        $this->assertCachePoolServiceDefinitionIsCreated($container, 'bar', 'cache.adapter.doctrine', 5);
-        $this->assertCachePoolServiceDefinitionIsCreated($container, 'baz', 'cache.adapter.filesystem', 7);
-        $this->assertCachePoolServiceDefinitionIsCreated($container, 'foobar', 'cache.adapter.psr6', 10);
-        $this->assertCachePoolServiceDefinitionIsCreated($container, 'def', 'cache.adapter.filesystem', 11);
+        $this->assertCachePoolServiceDefinitionIsCreated($container, 'cache.foo', 'cache.adapter.apcu', 30);
+        $this->assertCachePoolServiceDefinitionIsCreated($container, 'cache.bar', 'cache.adapter.doctrine', 5);
+        $this->assertCachePoolServiceDefinitionIsCreated($container, 'cache.baz', 'cache.adapter.filesystem', 7);
+        $this->assertCachePoolServiceDefinitionIsCreated($container, 'cache.foobar', 'cache.adapter.psr6', 10);
+        $this->assertCachePoolServiceDefinitionIsCreated($container, 'cache.def', 'cache.app', 11);
     }
 
     protected function createContainer(array $data = array())
@@ -601,7 +648,7 @@ abstract class FrameworkExtensionTest extends TestCase
         ), $data)));
     }
 
-    protected function createContainerFromFile($file, $data = array())
+    protected function createContainerFromFile($file, $data = array(), $resetCompilerPasses = true)
     {
         $cacheKey = md5(get_class($this).$file.serialize($data));
         if (isset(self::$containerCache[$cacheKey])) {
@@ -611,8 +658,10 @@ abstract class FrameworkExtensionTest extends TestCase
         $container->registerExtension(new FrameworkExtension());
         $this->loadFromFile($container, $file);
 
-        $container->getCompilerPassConfig()->setOptimizationPasses(array());
-        $container->getCompilerPassConfig()->setRemovingPasses(array());
+        if ($resetCompilerPasses) {
+            $container->getCompilerPassConfig()->setOptimizationPasses(array());
+            $container->getCompilerPassConfig()->setRemovingPasses(array());
+        }
         $container->compile();
 
         return self::$containerCache[$cacheKey] = $container;
@@ -658,15 +707,13 @@ abstract class FrameworkExtensionTest extends TestCase
         }
     }
 
-    private function assertCachePoolServiceDefinitionIsCreated(ContainerBuilder $container, $name, $adapter, $defaultLifetime)
+    private function assertCachePoolServiceDefinitionIsCreated(ContainerBuilder $container, $id, $adapter, $defaultLifetime)
     {
-        $id = 'cache.pool.'.$name;
-
         $this->assertTrue($container->has($id), sprintf('Service definition "%s" for cache pool of type "%s" is registered', $id, $adapter));
 
         $poolDefinition = $container->getDefinition($id);
 
-        $this->assertInstanceOf(DefinitionDecorator::class, $poolDefinition, sprintf('Cache pool "%s" is based on an abstract cache pool.', $name));
+        $this->assertInstanceOf(DefinitionDecorator::class, $poolDefinition, sprintf('Cache pool "%s" is based on an abstract cache pool.', $id));
 
         $this->assertTrue($poolDefinition->hasTag('cache.pool'), sprintf('Service definition "%s" is tagged with the "cache.pool" tag.', $id));
         $this->assertFalse($poolDefinition->isAbstract(), sprintf('Service definition "%s" is not abstract.', $id));
@@ -675,21 +722,34 @@ abstract class FrameworkExtensionTest extends TestCase
         $this->assertTrue(isset($tag[0]['default_lifetime']), 'The default lifetime is stored as an attribute of the "cache.pool" tag.');
         $this->assertSame($defaultLifetime, $tag[0]['default_lifetime'], 'The default lifetime is stored as an attribute of the "cache.pool" tag.');
 
-        $adapterId = $poolDefinition->getParent();
-        $adapterDefinition = $container->findDefinition($adapterId);
+        $parentDefinition = $poolDefinition;
+        do {
+            $parentId = $parentDefinition->getParent();
+            $parentDefinition = $container->findDefinition($parentId);
+        } while ($parentDefinition instanceof DefinitionDecorator);
 
         switch ($adapter) {
             case 'cache.adapter.apcu':
-                $this->assertSame(ApcuAdapter::class, $adapterDefinition->getClass());
+                $this->assertSame(ApcuAdapter::class, $parentDefinition->getClass());
                 break;
             case 'cache.adapter.doctrine':
-                $this->assertSame(DoctrineAdapter::class, $adapterDefinition->getClass());
+                $this->assertSame(DoctrineAdapter::class, $parentDefinition->getClass());
                 break;
+            case 'cache.app':
+                if (ChainAdapter::class === $parentDefinition->getClass()) {
+                    break;
+                }
             case 'cache.adapter.filesystem':
-                $this->assertSame(FilesystemAdapter::class, $adapterDefinition->getClass());
+                $this->assertSame(FilesystemAdapter::class, $parentDefinition->getClass());
                 break;
+            case 'cache.adapter.psr6':
+                $this->assertSame(ProxyAdapter::class, $parentDefinition->getClass());
+                break;
+            case 'cache.adapter.redis':
+                $this->assertSame(RedisAdapter::class, $parentDefinition->getClass());
+                break;
+            default:
+                $this->fail('Unresolved adapter: '.$adapter);
         }
-
-        $this->assertTrue($adapterDefinition->isAbstract(), sprintf('Service definition "%s" is abstract.', $adapterId));
     }
 }

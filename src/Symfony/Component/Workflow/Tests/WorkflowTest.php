@@ -4,7 +4,6 @@ namespace Symfony\Component\Workflow\Tests;
 
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Workflow\Definition;
-use Symfony\Component\Workflow\Event\Event;
 use Symfony\Component\Workflow\Event\GuardEvent;
 use Symfony\Component\Workflow\Marking;
 use Symfony\Component\Workflow\MarkingStore\MarkingStoreInterface;
@@ -44,7 +43,7 @@ class WorkflowTest extends \PHPUnit_Framework_TestCase
     {
         $subject = new \stdClass();
         $subject->marking = null;
-        $workflow = new Workflow(new Definition([], []), $this->createMock(MarkingStoreInterface::class));
+        $workflow = new Workflow(new Definition([], []), $this->getMock(MarkingStoreInterface::class));
 
         $workflow->getMarking($subject);
     }
@@ -230,8 +229,11 @@ class WorkflowTest extends \PHPUnit_Framework_TestCase
 
     private function createComplexWorkflow()
     {
+        $places = [];
 
-        $places = Place::fromNames(range('a', 'g'));
+        foreach (range('a', 'g') as $placeName) {
+            $places[] = new Place($placeName);
+        }
 
         $transitions = [
             new Transition('t1', $places[0], [$places[1], $places[2]]),
@@ -258,7 +260,6 @@ class WorkflowTest extends \PHPUnit_Framework_TestCase
     }
 }
 
-
 class EventDispatcherMock implements \Symfony\Component\EventDispatcher\EventDispatcherInterface
 {
     public $dispatchedEvents = [];
@@ -268,11 +269,25 @@ class EventDispatcherMock implements \Symfony\Component\EventDispatcher\EventDis
         $this->dispatchedEvents[] = $eventName;
     }
 
-    public function addListener($eventName, $listener, $priority = 0) {}
-    public function addSubscriber(\Symfony\Component\EventDispatcher\EventSubscriberInterface $subscriber) {}
-    public function removeListener($eventName, $listener) {}
-    public function removeSubscriber(\Symfony\Component\EventDispatcher\EventSubscriberInterface $subscriber) {}
-    public function getListeners($eventName = null) {}
-    public function getListenerPriority($eventName, $listener) {}
-    public function hasListeners($eventName = null) {}
+    public function addListener($eventName, $listener, $priority = 0)
+    {
+    }
+    public function addSubscriber(\Symfony\Component\EventDispatcher\EventSubscriberInterface $subscriber)
+    {
+    }
+    public function removeListener($eventName, $listener)
+    {
+    }
+    public function removeSubscriber(\Symfony\Component\EventDispatcher\EventSubscriberInterface $subscriber)
+    {
+    }
+    public function getListeners($eventName = null)
+    {
+    }
+    public function getListenerPriority($eventName, $listener)
+    {
+    }
+    public function hasListeners($eventName = null)
+    {
+    }
 }

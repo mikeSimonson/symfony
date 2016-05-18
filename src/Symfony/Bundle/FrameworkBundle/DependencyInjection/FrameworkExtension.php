@@ -24,6 +24,7 @@ use Symfony\Component\Config\Resource\DirectoryResource;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpKernel\DependencyInjection\Extension;
 use Symfony\Component\Config\FileLocator;
+use Symfony\Component\Serializer\Mapping\Factory\CacheClassMetadataFactory;
 use Symfony\Component\Serializer\Normalizer\DataUriNormalizer;
 use Symfony\Component\Serializer\Normalizer\DateTimeNormalizer;
 use Symfony\Component\Serializer\Normalizer\JsonSerializableNormalizer;
@@ -71,6 +72,9 @@ class FrameworkExtension extends Extension
 
         // Property access is used by both the Form and the Validator component
         $loader->load('property_access.xml');
+
+        // Load Cache configuration first as it is used by other components
+        $loader->load('cache.xml');
 
         $configuration = $this->getConfiguration($configs, $container);
         $config = $this->processConfiguration($configuration, $configs);
@@ -831,7 +835,7 @@ class FrameworkExtension extends Extension
             }
         }
 
-        if (isset($config['cache'])) {
+        if (!$container->getParameter('kernel.debug')) {
             $container->setParameter(
                 'validator.mapping.cache.prefix',
                 'validator_'.$this->getKernelRootHash($container)
@@ -1030,6 +1034,8 @@ class FrameworkExtension extends Extension
         $chainLoader->replaceArgument(0, $serializerLoaders);
 
         if (isset($config['cache']) && $config['cache']) {
+            @trigger_error('The "framework.serializer.cache" option is deprecated since Symfony 3.1 and will be removed in 4.0. Configure the "cache.serializer" service under "framework.cache.pools" instead.', E_USER_DEPRECATED);
+
             $container->setParameter(
                 'serializer.mapping.cache.prefix',
                 'serializer_'.$this->getKernelRootHash($container)
@@ -1038,6 +1044,18 @@ class FrameworkExtension extends Extension
             $container->getDefinition('serializer.mapping.class_metadata_factory')->replaceArgument(
                 1, new Reference($config['cache'])
             );
+        } elseif (!$container->getParameter('kernel.debug')) {
+            $cacheMetadataFactory = new Definition(
+                CacheClassMetadataFactory::class,
+                array(
+                    new Reference('serializer.mapping.cache_class_metadata_factory.inner'),
+                    new Reference('cache.serializer'),
+                )
+            );
+            $cacheMetadataFactory->setPublic(false);
+            $cacheMetadataFactory->setDecoratedService('serializer.mapping.class_metadata_factory');
+
+            $container->setDefinition('serializer.mapping.cache_class_metadata_factory', $cacheMetadataFactory);
         }
 
         if (isset($config['name_converter']) && $config['name_converter']) {
@@ -1069,15 +1087,29 @@ class FrameworkExtension extends Extension
 
     private function registerCacheConfiguration(array $config, ContainerBuilder $container, XmlFileLoader $loader)
     {
-        $loader->load('cache_pools.xml');
+        $nonce = substr(str_replace('/', '-', base64_encode(md5(uniqid(mt_rand(), true), true))), 0, -2);
+        $container->getDefinition('cache.adapter.apcu')->replaceArgument(2, $nonce);
+        $container->getDefinition('cache.adapter.system')->replaceArgument(2, $nonce);
+        $container->getDefinition('cache.adapter.filesystem')->replaceArgument(2, $config['directory']);
 
-        foreach ($config['pools'] as $name => $poolConfig) {
-            $poolDefinition = new DefinitionDecorator($poolConfig['adapter']);
-            $poolDefinition->setPublic($poolConfig['public']);
-            unset($poolConfig['adapter'], $poolConfig['public']);
+        foreach (array('doctrine', 'psr6', 'redis') as $name) {
+            if (isset($config[$name = 'default_'.$name.'_provider'])) {
+                $container->setAlias('cache.'.$name, Compiler\CachePoolPass::getServiceProvider($container, $config[$name]));
+            }
+        }
+        foreach (array('app', 'system') as $name) {
+            $config['pools']['cache.'.$name] = array(
+                'adapter' => $config[$name],
+                'public' => true,
+            );
+        }
+        foreach ($config['pools'] as $name => $pool) {
+            $definition = new DefinitionDecorator($pool['adapter']);
+            $definition->setPublic($pool['public']);
+            unset($pool['adapter'], $pool['public']);
 
-            $poolDefinition->addTag('cache.pool', $poolConfig);
-            $container->setDefinition('cache.pool.'.$name, $poolDefinition);
+            $definition->addTag('cache.pool', $pool);
+            $container->setDefinition($name, $definition);
         }
 
         $this->addClassesToCompile(array(

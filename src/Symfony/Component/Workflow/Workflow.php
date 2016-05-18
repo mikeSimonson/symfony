@@ -64,8 +64,8 @@ class Workflow
         }
 
         // check if the subject is already in the workflow
-        if (empty($marking->getPlaces())) {
-            if ($this->definition->getInitialPlace() === null) {
+        if (!$marking->getPlaces()) {
+            if (!$this->definition->getInitialPlace()) {
                 throw new LogicException(sprintf('The Marking is empty and there is no initial place for workflow "%s".', $this->name));
             }
             $marking->mark($this->definition->getInitialPlace());

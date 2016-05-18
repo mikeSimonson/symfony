@@ -13,19 +13,17 @@ use Symfony\Component\Workflow\Workflow;
 
 class AuditTrailListenerTest extends \PHPUnit_Framework_TestCase
 {
-
     public function testItWorks()
     {
-        $places = Place::fromNames(['a', 'b']);
-
         $a = new Place('a');
         $b = new Place('b');
+
         $transitions = [
             new Transition('t1', $a, $b),
             new Transition('t2', $a, $b),
         ];
 
-        $definition = new Definition($places, $transitions);
+        $definition = new Definition([$a, $b], $transitions);
 
         $object = new \stdClass();
         $object->marking = null;

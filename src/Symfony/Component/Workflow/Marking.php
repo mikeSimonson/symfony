@@ -16,10 +16,6 @@ namespace Symfony\Component\Workflow;
  *
  * @author Grégoire Pineau <lyrixx@lyrixx.info>
  */
-/**
- * Class Marking
- * @package Symfony\Component\Workflow
- */
 class Marking
 {
     /**
@@ -28,26 +24,13 @@ class Marking
     private $places = array();
 
     /**
-     * @param string[] $places keys are the place name and values should be 1
+     * @param string[] $representation keys are the place name and values should be 1
      */
-    public function __construct(array $places = array())
+    public function __construct(array $representation = array())
     {
-        foreach ($places as $place => $nbToken) {
-            $this->markPlaceNamed($place);
+        foreach ($representation as $placeName => $nbToken) {
+            $this->markPlaceNamed($placeName);
         }
-    }
-
-    /**
-     * @param Place[] $places
-     * @return Marking
-     */
-    public static function fromPlaces(array $places = array())
-    {
-        $placeNames = [];
-        foreach($places as $place) {
-            $placeNames[$place->getName()] = 1;
-        }
-        return new self($placeNames);
     }
 
     /**
@@ -67,7 +50,7 @@ class Marking
     }
 
     /**
-     * @param string $placename place name
+     * @param string $placeName place name
      */
     public function markPlaceNamed($placeName)
     {
@@ -84,6 +67,7 @@ class Marking
 
     /**
      * @param Place $place
+     *
      * @return bool
      */
     public function has(Place $place)
@@ -92,12 +76,13 @@ class Marking
     }
 
     /**
-     * @param string $place place name
+     * @param string $placeName place name
+     *
      * @return bool
      */
-    public function hasPlaceNamed($name)
+    public function hasPlaceNamed($placeName)
     {
-        return isset($this->places[$name]);
+        return isset($this->places[$placeName]);
     }
 
     /**

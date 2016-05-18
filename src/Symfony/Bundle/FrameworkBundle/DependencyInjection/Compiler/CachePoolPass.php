@@ -11,8 +11,10 @@
 
 namespace Symfony\Bundle\FrameworkBundle\DependencyInjection\Compiler;
 
+use Symfony\Component\Cache\Adapter\RedisAdapter;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\DefinitionDecorator;
 use Symfony\Component\DependencyInjection\Reference;
 
@@ -26,6 +28,14 @@ class CachePoolPass implements CompilerPassInterface
      */
     public function process(ContainerBuilder $container)
     {
+        $namespaceSuffix = '';
+
+        foreach (array('name', 'root_dir', 'environment', 'debug') as $key) {
+            if ($container->hasParameter('kernel.'.$key)) {
+                $namespaceSuffix .= '.'.$container->getParameter('kernel.'.$key);
+            }
+        }
+
         $attributes = array(
             'provider',
             'namespace',
@@ -36,14 +46,14 @@ class CachePoolPass implements CompilerPassInterface
             if ($pool->isAbstract()) {
                 continue;
             }
-            if (!isset($tags[0]['namespace'])) {
-                $tags[0]['namespace'] = $this->getNamespace($id);
-            }
             while ($adapter instanceof DefinitionDecorator) {
                 $adapter = $container->findDefinition($adapter->getParent());
                 if ($t = $adapter->getTag('cache.pool')) {
                     $tags[0] += $t[0];
                 }
+            }
+            if (!isset($tags[0]['namespace'])) {
+                $tags[0]['namespace'] = $this->getNamespace($namespaceSuffix, $id);
             }
             if (isset($tags[0]['clearer'])) {
                 $clearer = $container->getDefinition($tags[0]['clearer']);
@@ -52,8 +62,8 @@ class CachePoolPass implements CompilerPassInterface
             }
             unset($tags[0]['clearer']);
 
-            if (isset($tags[0]['provider']) && is_string($tags[0]['provider'])) {
-                $tags[0]['provider'] = new Reference($tags[0]['provider']);
+            if (isset($tags[0]['provider'])) {
+                $tags[0]['provider'] = new Reference(static::getServiceProvider($container, $tags[0]['provider']));
             }
             $i = 0;
             foreach ($attributes as $attr) {
@@ -72,8 +82,28 @@ class CachePoolPass implements CompilerPassInterface
         }
     }
 
-    private function getNamespace($id)
+    private function getNamespace($namespaceSuffix, $id)
     {
-        return substr(str_replace('/', '-', base64_encode(md5('symfony.'.$id, true))), 0, 10);
+        return substr(str_replace('/', '-', base64_encode(md5($id.$namespaceSuffix, true))), 0, 10);
+    }
+
+    /**
+     * @internal
+     */
+    public static function getServiceProvider(ContainerBuilder $container, $name)
+    {
+        if (0 === strpos($name, 'redis://')) {
+            $dsn = $name;
+
+            if (!$container->hasDefinition($name = md5($dsn))) {
+                $definition = new Definition(\Redis::class);
+                $definition->setPublic(false);
+                $definition->setFactory(array(RedisAdapter::class, 'createConnection'));
+                $definition->setArguments(array($dsn));
+                $container->setDefinition($name, $definition);
+            }
+        }
+
+        return $name;
     }
 }

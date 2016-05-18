@@ -17,6 +17,28 @@ Form
  * Support for data objects that implements both `Traversable` and
    `ArrayAccess` in `ResizeFormListener::preSubmit` method has been removed.
 
+ * Using callable strings as choice options in ChoiceType is not supported
+   anymore in favor of passing PropertyPath instances.
+
+   Before:
+
+   ```php
+   'choice_value' => new PropertyPath('range'),
+   'choice_label' => 'strtoupper',
+   ```
+
+   After:
+
+   ```php
+   'choice_value' => 'range',
+   'choice_label' => function ($choice) {
+       return strtoupper($choice);
+   },
+   ```
+
+ * Caching of the loaded `ChoiceListInterface` in the `LazyChoiceList` has been removed,
+   it must be cached in the `ChoiceLoaderInterface` implementation instead.
+
 FrameworkBundle
 ---------------
 
@@ -54,6 +76,12 @@ FrameworkBundle
     - `"form.type.button"`
     - `"form.type.submit"`
     - `"form.type.reset"`
+
+ * The service `serializer.mapping.cache.apc` has been removed; use
+   `serializer.mapping.cache.doctrine.apc` instead.
+
+ * The `framework.serializer.cache` option has been removed. APCu should now
+   be automatically used when available so you can remove this configuration key.
 
 HttpKernel
 ----------

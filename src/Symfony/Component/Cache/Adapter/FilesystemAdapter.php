@@ -63,9 +63,7 @@ class FilesystemAdapter extends AbstractAdapter
             if (!$h = @fopen($file, 'rb')) {
                 continue;
             }
-            flock($h, LOCK_SH);
             if ($now >= (int) $expiresAt = fgets($h)) {
-                flock($h, LOCK_UN);
                 fclose($h);
                 if (isset($expiresAt[0])) {
                     @unlink($file);
@@ -73,7 +71,6 @@ class FilesystemAdapter extends AbstractAdapter
             } else {
                 $i = rawurldecode(rtrim(fgets($h)));
                 $value = stream_get_contents($h);
-                flock($h, LOCK_UN);
                 fclose($h);
                 if ($i === $id) {
                     $values[$id] = unserialize($value);
@@ -130,16 +127,15 @@ class FilesystemAdapter extends AbstractAdapter
     {
         $ok = true;
         $expiresAt = $lifetime ? time() + $lifetime : PHP_INT_MAX;
+        $tmp = $this->directory.uniqid('', true);
 
         foreach ($values as $id => $value) {
-            $file = $this->getFile($id);
-            $dir = dirname($file);
-            if (!file_exists($dir)) {
-                @mkdir($dir, 0777, true);
-            }
+            $file = $this->getFile($id, true);
+
             $value = $expiresAt."\n".rawurlencode($id)."\n".serialize($value);
-            if (false !== @file_put_contents($file, $value, LOCK_EX)) {
-                @touch($file, $expiresAt);
+            if (false !== @file_put_contents($tmp, $value)) {
+                @touch($tmp, $expiresAt);
+                $ok = @rename($tmp, $file) && $ok;
             } else {
                 $ok = false;
             }
@@ -148,10 +144,15 @@ class FilesystemAdapter extends AbstractAdapter
         return $ok;
     }
 
-    private function getFile($id)
+    private function getFile($id, $mkdir = false)
     {
         $hash = str_replace('/', '-', base64_encode(md5($id, true)));
+        $dir = $this->directory.$hash[0].DIRECTORY_SEPARATOR.$hash[1].DIRECTORY_SEPARATOR;
 
-        return $this->directory.$hash[0].DIRECTORY_SEPARATOR.$hash[1].DIRECTORY_SEPARATOR.substr($hash, 2, -2);
+        if ($mkdir && !file_exists($dir)) {
+            @mkdir($dir, 0777, true);
+        }
+
+        return $dir.substr($hash, 2, -2);
     }
 }

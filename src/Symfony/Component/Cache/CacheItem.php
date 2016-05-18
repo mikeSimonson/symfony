@@ -73,7 +73,7 @@ final class CacheItem implements CacheItemInterface
         if (null === $expiration) {
             $this->expiry = $this->defaultLifetime > 0 ? time() + $this->defaultLifetime : null;
         } elseif ($expiration instanceof \DateTimeInterface) {
-            $this->expiry = $expiration->format('U');
+            $this->expiry = (int) $expiration->format('U');
         } else {
             throw new InvalidArgumentException(sprintf('Expiration date must implement DateTimeInterface or be null, "%s" given', is_object($expiration) ? get_class($expiration) : gettype($expiration)));
         }
@@ -89,7 +89,7 @@ final class CacheItem implements CacheItemInterface
         if (null === $time) {
             $this->expiry = $this->defaultLifetime > 0 ? time() + $this->defaultLifetime : null;
         } elseif ($time instanceof \DateInterval) {
-            $this->expiry = \DateTime::createFromFormat('U', time())->add($time)->format('U');
+            $this->expiry = (int) \DateTime::createFromFormat('U', time())->add($time)->format('U');
         } elseif (is_int($time)) {
             $this->expiry = $time + time();
         } else {
@@ -97,6 +97,26 @@ final class CacheItem implements CacheItemInterface
         }
 
         return $this;
+    }
+
+    /**
+     * Validates a cache key according to PSR-6.
+     *
+     * @param string $key The key to validate.
+     *
+     * @throws InvalidArgumentException When $key is not valid.
+     */
+    public static function validateKey($key)
+    {
+        if (!is_string($key)) {
+            throw new InvalidArgumentException(sprintf('Cache key must be string, "%s" given', is_object($key) ? get_class($key) : gettype($key)));
+        }
+        if (!isset($key[0])) {
+            throw new InvalidArgumentException('Cache key length must be greater than zero');
+        }
+        if (isset($key[strcspn($key, '{}()/\@:')])) {
+            throw new InvalidArgumentException(sprintf('Cache key "%s" contains reserved characters {}()/\@:', $key));
+        }
     }
 
     /**

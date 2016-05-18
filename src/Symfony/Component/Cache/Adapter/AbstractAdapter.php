@@ -14,8 +14,8 @@ namespace Symfony\Component\Cache\Adapter;
 use Psr\Cache\CacheItemInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Cache\CacheItem;
-use Symfony\Component\Cache\Exception\InvalidArgumentException;
 
 /**
  * @author Nicolas Grekas <p@tchwork.com>
@@ -31,7 +31,7 @@ abstract class AbstractAdapter implements AdapterInterface, LoggerAwareInterface
 
     protected function __construct($namespace = '', $defaultLifetime = 0)
     {
-        $this->namespace = $this->getId($namespace, true);
+        $this->namespace = '' === $namespace ? '' : $this->getId($namespace);
         $this->createCacheItem = \Closure::bind(
             function ($key, $value, $isHit) use ($defaultLifetime) {
                 $item = new CacheItem();
@@ -46,15 +46,18 @@ abstract class AbstractAdapter implements AdapterInterface, LoggerAwareInterface
             CacheItem::class
         );
         $this->mergeByLifetime = \Closure::bind(
-            function ($deferred, $namespace) {
+            function ($deferred, $namespace, &$expiredIds) {
                 $byLifetime = array();
                 $now = time();
+                $expiredIds = array();
 
                 foreach ($deferred as $key => $item) {
                     if (null === $item->expiry) {
                         $byLifetime[0][$namespace.$key] = $item->value;
                     } elseif ($item->expiry > $now) {
                         $byLifetime[$item->expiry - $now][$namespace.$key] = $item->value;
+                    } else {
+                        $expiredIds[] = $namespace.$key;
                     }
                 }
 
@@ -63,6 +66,24 @@ abstract class AbstractAdapter implements AdapterInterface, LoggerAwareInterface
             $this,
             CacheItem::class
         );
+    }
+
+    public static function createSystemCache($namespace, $defaultLifetime, $nonce, $directory, LoggerInterface $logger = null)
+    {
+        $fs = new FilesystemAdapter($namespace, $defaultLifetime, $directory);
+        if (null !== $logger) {
+            $fs->setLogger($logger);
+        }
+        if (!ApcuAdapter::isSupported()) {
+            return $fs;
+        }
+
+        $apcu = new ApcuAdapter($namespace, $defaultLifetime / 5, $nonce);
+        if (null !== $logger) {
+            $apcu->setLogger($logger);
+        }
+
+        return new ChainAdapter(array($apcu, $fs));
     }
 
     /**
@@ -147,7 +168,7 @@ abstract class AbstractAdapter implements AdapterInterface, LoggerAwareInterface
         $ids = array();
 
         foreach ($keys as $key) {
-            $ids[$key] = $this->getId($key);
+            $ids[] = $this->getId($key);
         }
         try {
             $items = $this->doFetch($ids);
@@ -155,7 +176,7 @@ abstract class AbstractAdapter implements AdapterInterface, LoggerAwareInterface
             CacheItem::log($this->logger, 'Failed to fetch requested items', array('keys' => $keys, 'exception' => $e));
             $items = array();
         }
-        $ids = array_flip($ids);
+        $ids = array_combine($ids, $keys);
 
         return $this->generateItems($items, $ids);
     }
@@ -225,7 +246,7 @@ abstract class AbstractAdapter implements AdapterInterface, LoggerAwareInterface
 
         $ok = true;
 
-        // When bulk-save failed, retry each item individually
+        // When bulk-delete failed, retry each item individually
         foreach ($ids as $key => $id) {
             try {
                 $e = null;
@@ -277,9 +298,12 @@ abstract class AbstractAdapter implements AdapterInterface, LoggerAwareInterface
     {
         $ok = true;
         $byLifetime = $this->mergeByLifetime;
-        $byLifetime = $byLifetime($this->deferred, $this->namespace);
+        $byLifetime = $byLifetime($this->deferred, $this->namespace, $expiredIds);
         $retry = $this->deferred = array();
 
+        if ($expiredIds) {
+            $this->doDelete($expiredIds);
+        }
         foreach ($byLifetime as $lifetime => $values) {
             try {
                 $e = $this->doSave($values, $lifetime);
@@ -318,7 +342,6 @@ abstract class AbstractAdapter implements AdapterInterface, LoggerAwareInterface
                 CacheItem::log($this->logger, 'Failed to save key "{key}" ({type})', array('key' => substr($id, strlen($this->namespace)), 'type' => $type, 'exception' => $e instanceof \Exception ? $e : null));
             }
         }
-        $this->deferred = array();
 
         return $ok;
     }
@@ -330,17 +353,9 @@ abstract class AbstractAdapter implements AdapterInterface, LoggerAwareInterface
         }
     }
 
-    private function getId($key, $ns = false)
+    private function getId($key)
     {
-        if (!is_string($key)) {
-            throw new InvalidArgumentException(sprintf('Cache key must be string, "%s" given', is_object($key) ? get_class($key) : gettype($key)));
-        }
-        if (!isset($key[0]) && !$ns) {
-            throw new InvalidArgumentException('Cache key length must be greater than zero');
-        }
-        if (isset($key[strcspn($key, '{}()/\@:')])) {
-            throw new InvalidArgumentException('Cache key contains reserved characters {}()/\@:');
-        }
+        CacheItem::validateKey($key);
 
         return $this->namespace.$key;
     }

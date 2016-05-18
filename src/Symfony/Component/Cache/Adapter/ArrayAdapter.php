@@ -15,7 +15,6 @@ use Psr\Cache\CacheItemInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Symfony\Component\Cache\CacheItem;
-use Symfony\Component\Cache\Exception\InvalidArgumentException;
 
 /**
  * @author Nicolas Grekas <p@tchwork.com>
@@ -74,7 +73,7 @@ class ArrayAdapter implements AdapterInterface, LoggerAwareInterface
     public function getItems(array $keys = array())
     {
         foreach ($keys as $key) {
-            $this->validateKey($key);
+            CacheItem::validateKey($key);
         }
 
         return $this->generateItems($keys, time());
@@ -85,7 +84,9 @@ class ArrayAdapter implements AdapterInterface, LoggerAwareInterface
      */
     public function hasItem($key)
     {
-        return isset($this->expiries[$this->validateKey($key)]) && ($this->expiries[$key] >= time() || !$this->deleteItem($key));
+        CacheItem::validateKey($key);
+
+        return isset($this->expiries[$key]) && ($this->expiries[$key] >= time() || !$this->deleteItem($key));
     }
 
     /**
@@ -103,7 +104,9 @@ class ArrayAdapter implements AdapterInterface, LoggerAwareInterface
      */
     public function deleteItem($key)
     {
-        unset($this->values[$this->validateKey($key)], $this->expiries[$key]);
+        CacheItem::validateKey($key);
+
+        unset($this->values[$key], $this->expiries[$key]);
 
         return true;
     }
@@ -134,6 +137,8 @@ class ArrayAdapter implements AdapterInterface, LoggerAwareInterface
         $expiry = $item[CacheItem::CAST_PREFIX.'expiry'];
 
         if (null !== $expiry && $expiry <= time()) {
+            $this->deleteItem($key);
+
             return true;
         }
         if ($this->storeSerialized) {
@@ -167,21 +172,6 @@ class ArrayAdapter implements AdapterInterface, LoggerAwareInterface
     public function commit()
     {
         return true;
-    }
-
-    private function validateKey($key)
-    {
-        if (!is_string($key)) {
-            throw new InvalidArgumentException(sprintf('Cache key must be string, "%s" given', is_object($key) ? get_class($key) : gettype($key)));
-        }
-        if (!isset($key[0])) {
-            throw new InvalidArgumentException('Cache key length must be greater than zero');
-        }
-        if (isset($key[strcspn($key, '{}()/\@:')])) {
-            throw new InvalidArgumentException('Cache key contains reserved characters {}()/\@:');
-        }
-
-        return $key;
     }
 
     private function generateItems(array $keys, $now)

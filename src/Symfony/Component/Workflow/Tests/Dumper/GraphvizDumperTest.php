@@ -2,8 +2,6 @@
 
 namespace Symfony\Component\Workflow\Tests\Dumper;
 
-
-use phpDocumentor\Reflection\Types\This;
 use Symfony\Component\Workflow\Definition;
 use Symfony\Component\Workflow\Dumper\GraphvizDumper;
 use Symfony\Component\Workflow\Marking;
@@ -12,7 +10,6 @@ use Symfony\Component\Workflow\Transition;
 
 class GraphvizDumperTest extends \PHPUnit_Framework_TestCase
 {
-
     private $dumper;
 
     public function setUp()
@@ -30,33 +27,32 @@ class GraphvizDumperTest extends \PHPUnit_Framework_TestCase
 
         $this->assertEquals($expected, $dump);
     }
-    
+
     /**
      * @dataProvider provideWorkflowDefinitionWithMarking
      */
     public function testWorkflowWithMarking($definition, $marking, $expected)
     {
         $dump = $this->dumper->dump($definition, $marking);
-        
+
         $this->assertEquals($expected, $dump);
     }
 
     public function provideWorkflowDefinitionWithMarking()
     {
-        return [
-            [
-                $this->provideComplexWorkflowDefinition(),
-                new Marking(['b' => 1]),
-                $this->provideComplexWorkflowDumpWithMarking()
-            ],
-            [
-                $this->provideSimpleWorkflowDefinition(),
-                Marking::fromPlaces(Place::fromNames(['c', 'd'])),
-                $this->provideSimpleWorkflowDumpWithMarking()
-            ],
+        yield [
+            $this->provideComplexWorkflowDefinition(),
+            new Marking(['b' => 1]),
+            $this->provideComplexWorkflowDumpWithMarking(),
+        ];
+
+        yield [
+            $this->provideSimpleWorkflowDefinition(),
+            new Marking(['c' => 1, 'd' => 1]),
+            $this->provideSimpleWorkflowDumpWithMarking(),
         ];
     }
-    
+
     public function provideWorkflowDefinitionWithoutMarking()
     {
         return [
@@ -64,21 +60,28 @@ class GraphvizDumperTest extends \PHPUnit_Framework_TestCase
             [$this->provideSimpleWorkflowDefinition(), $this->provideSimpleWorkflowDumpWithoutMarking()],
         ];
     }
-    
+
     public function provideComplexWorkflowDefinition()
     {
-        $places = Place::fromNames(range('a', 'g'));
+        $a = new Place('a');
+        $b = new Place('b');
+        $c = new Place('c');
+        $d = new Place('d');
+        $e = new Place('e');
+        $f = new Place('f');
+        $g = new Place('g');
+
         $transitions = [
-            new Transition('t1', new Place('a'), Place::fromNames(['b', 'c'])),
-            new Transition('t2', new Place('c'), new Place('d')),
-            new Transition('t3', new Place('b'), new Place('e')),
-            new Transition('t4', Place::fromNames(['d', 'e']), new Place('f')),
-            new Transition('t5', new Place('f'), new Place('g')),
+            new Transition('t1', $a, [$b, $c]),
+            new Transition('t2', $c, $d),
+            new Transition('t3', $b, $e),
+            new Transition('t4', [$d, $e], $f),
+            new Transition('t5', $f, $g),
         ];
-        
-        return new Definition($places, $transitions);
+
+        return new Definition([$a, $b, $c, $d, $e, $f, $g], $transitions);
     }
-    
+
     public function provideComplexWorkflowDumpWithMarking()
     {
         return 'digraph workflow {
@@ -113,7 +116,7 @@ class GraphvizDumperTest extends \PHPUnit_Framework_TestCase
 }
 ';
     }
-    
+
     public function provideSimpleWorkflowDumpWithMarking()
     {
         return 'digraph workflow {
@@ -133,7 +136,7 @@ class GraphvizDumperTest extends \PHPUnit_Framework_TestCase
 }
 ';
     }
-    
+
     public function provideComplexWorkflowDumpWithoutMarking()
     {
         return 'digraph workflow {
@@ -168,7 +171,7 @@ class GraphvizDumperTest extends \PHPUnit_Framework_TestCase
 }
 ';
     }
-    
+
     public function provideSimpleWorkflowDumpWithoutMarking()
     {
         return 'digraph workflow {
@@ -188,14 +191,18 @@ class GraphvizDumperTest extends \PHPUnit_Framework_TestCase
 }
 ';
     }
-    
+
     public function provideSimpleWorkflowDefinition()
     {
-        $places = Place::fromNames(range('a', 'c'));
+        $a = new Place('a');
+        $b = new Place('b');
+        $c = new Place('c');
+
         $transitions = [
-            new Transition('t1', new Place('a'), new Place('b')),
-            new Transition('t2', new Place('b'), new Place('c')),
+            new Transition('t1', $a, $b),
+            new Transition('t2', $b, $c),
         ];
-        return new Definition($places, $transitions);
+
+        return new Definition([$a, $b, $c], $transitions);
     }
 }
