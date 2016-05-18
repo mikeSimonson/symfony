@@ -32,10 +32,10 @@ class PropertyAccessorMarkingStore implements MarkingStoreInterface
      */
     private $propertyAccessor;
 
-
     /**
      * PropertyAccessorMarkingStore constructor.
-     * @param string $property
+     *
+     * @param string                         $property
      * @param PropertyAccessorInterface|null $propertyAccessor
      */
     public function __construct($property = 'marking', PropertyAccessorInterface $propertyAccessor = null)
@@ -46,6 +46,7 @@ class PropertyAccessorMarkingStore implements MarkingStoreInterface
 
     /**
      * @param object $subject
+     *
      * @return Marking
      */
     public function getMarking($subject)
@@ -54,7 +55,7 @@ class PropertyAccessorMarkingStore implements MarkingStoreInterface
     }
 
     /**
-     * @param object $subject
+     * @param object  $subject
      * @param Marking $marking
      */
     public function setMarking($subject, Marking $marking)

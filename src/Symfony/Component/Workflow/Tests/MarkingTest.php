@@ -7,69 +7,60 @@ use Symfony\Component\Workflow\Place;
 
 class MarkingTest extends \PHPUnit_Framework_TestCase
 {
-
-    /**
-     * @dataProvider provideMethodByType
-     */
-    public function testConstructor($methods, $places)
+    public function testWithNaming()
     {
-        $marking = $this->{$methods['create']}();
+        $marking = new Marking(['a' => 1]);
 
-        $this->assertTrue($marking->{$methods['has']}($places['a']));
-        $this->assertFalse($marking->{$methods['has']}($places['b']));
+        $this->assertTrue($marking->hasPlaceNamed('a'));
+        $this->assertFalse($marking->hasPlaceNamed('b'));
         $this->assertSame(['a' => 1], $marking->getPlaces());
 
-        $marking->{$methods['mark']}($places['b']);
+        $marking->markPlaceNamed('b');
 
-        $this->assertTrue($marking->{$methods['has']}($places['a']));
-        $this->assertTrue($marking->{$methods['has']}($places['b']));
+        $this->assertTrue($marking->hasPlaceNamed('a'));
+        $this->assertTrue($marking->hasPlaceNamed('b'));
         $this->assertSame(['a' => 1, 'b' => 1], $marking->getPlaces());
 
-        $marking->{$methods['unmark']}($places['a']);
+        $marking->unmarkPlaceNamed('a');
 
-        $this->assertFalse($marking->{$methods['has']}($places['a']));
-        $this->assertTrue($marking->{$methods['has']}($places['b']));
+        $this->assertFalse($marking->hasPlaceNamed('a'));
+        $this->assertTrue($marking->hasPlaceNamed('b'));
         $this->assertSame(['b' => 1], $marking->getPlaces());
 
-        $marking->{$methods['unmark']}($places['b']);
+        $marking->unmarkPlaceNamed('b');
 
-        $this->assertFalse($marking->{$methods['has']}($places['a']));
-        $this->assertFalse($marking->{$methods['has']}($places['b']));
+        $this->assertFalse($marking->hasPlaceNamed('a'));
+        $this->assertFalse($marking->hasPlaceNamed('b'));
         $this->assertSame([], $marking->getPlaces());
     }
-    
-    public function provideMethodByType()
-    {
-        return [
-            [[
-                'create' => 'provideMarkingByNew',
-                'mark' => 'mark',
-                'unmark' => 'unmark',
-                'has' => 'has',
-            ], [
-                'a' => new Place('a'),
-                'b' => new Place('b'),
-            ]],
-            [[
-                'create' => 'provideMarkingStaticConstructor',
-                'mark' => 'markPlaceNamed',
-                'unmark' => 'unmarkPlaceNamed',
-                'has' => 'hasPlaceNamed',
-            ], [
-                'a' => 'a',
-                'b' => 'b',
-            ]],
-        ];
-    }
-    
-    private function provideMarkingByNew()
-    {
-        return new Marking(['a' => 1]);
-    }
-    
-    private function provideMarkingStaticConstructor()
-    {
-        return Marking::fromPlaces([new Place('a')]);
-    }
 
+    public function testWithObject()
+    {
+        $a = new Place('a');
+        $b = new Place('b');
+
+        $marking = new Marking(['a' => 1]);
+
+        $this->assertTrue($marking->has($a));
+        $this->assertFalse($marking->has($b));
+        $this->assertSame(['a' => 1], $marking->getPlaces());
+
+        $marking->mark($b);
+
+        $this->assertTrue($marking->has($a));
+        $this->assertTrue($marking->has($b));
+        $this->assertSame(['a' => 1, 'b' => 1], $marking->getPlaces());
+
+        $marking->unmark($a);
+
+        $this->assertFalse($marking->has($a));
+        $this->assertTrue($marking->has($b));
+        $this->assertSame(['b' => 1], $marking->getPlaces());
+
+        $marking->unmark($b);
+
+        $this->assertFalse($marking->has($a));
+        $this->assertFalse($marking->has($b));
+        $this->assertSame([], $marking->getPlaces());
+    }
 }

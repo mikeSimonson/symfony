@@ -12,30 +12,28 @@ namespace Symfony\Component\Workflow;
 
 use Symfony\Component\Workflow\Exception\InvalidArgumentException;
 
+/**
+ * @author Grégoire Pineau <lyrixx@lyrixx.info>
+ */
 class Place
 {
-
     /**
      * @var string
      */
     private $name;
 
+    /**
+     * Place constructor.
+     *
+     * @param string $name
+     */
     public function __construct($name)
     {
         if (!preg_match('{^[\w\d_-]+$}', $name)) {
             throw new InvalidArgumentException(sprintf('The place "%s" contains invalid characters.', $name));
         }
+
         $this->name = $name;
-    }
-
-    public static function fromNames(array $names)
-    {
-        $places = [];
-        foreach ($names as $name) {
-            $places[] = new self($name);
-        }
-
-        return $places;
     }
 
     /**

@@ -34,10 +34,10 @@ class Definition
      */
     private $initialPlace;
 
-
     /**
      * Definition constructor.
-     * @param Place[] $places
+     *
+     * @param Place[]      $places
      * @param Transition[] $transitions
      */
     public function __construct(array $places, array $transitions)
@@ -106,6 +106,7 @@ class Definition
 
     /**
      * @param Transition[] $transitions
+     *
      * @throws LogicException
      */
     public function addTransitions(array $transitions)
@@ -117,6 +118,7 @@ class Definition
 
     /**
      * @param Transition $transition
+     *
      * @throws LogicException
      */
     public function addTransition(Transition $transition)

@@ -8,10 +8,9 @@ use Symfony\Component\Workflow\Transition;
 
 class DefinitionTest extends \PHPUnit_Framework_TestCase
 {
-
     public function testAddPlaces()
     {
-        $places = Place::fromNames(range('a', 'e'));
+        $places = $this->createPlaces(range('a', 'e'));
         $definition = new Definition($places, []);
 
         $this->assertCount(5, $definition->getPlaces());
@@ -21,7 +20,7 @@ class DefinitionTest extends \PHPUnit_Framework_TestCase
 
     public function testSetInitialPlace()
     {
-        $places = Place::fromNames(range('a', 'e'));
+        $places = $this->createPlaces(range('a', 'e'));
         $definition = new Definition($places, []);
 
         $definition->setInitialPlace($places[3]);
@@ -42,7 +41,7 @@ class DefinitionTest extends \PHPUnit_Framework_TestCase
 
     public function testAddTransition()
     {
-        $places = Place::fromNames(['a', 'b']);
+        $places = $this->createPlaces(['a', 'b']);
 
         $transition = new Transition('name', $places[0], $places[1]);
         $definition = new Definition($places, [$transition]);
@@ -57,7 +56,7 @@ class DefinitionTest extends \PHPUnit_Framework_TestCase
      */
     public function testAddTransitionAndFromPlaceIsNotDefined()
     {
-        $places = Place::fromNames(['a', 'b']);
+        $places = $this->createPlaces(['a', 'b']);
 
         new Definition($places, [new Transition('name', new Place('c'), $places[1])]);
     }
@@ -68,8 +67,19 @@ class DefinitionTest extends \PHPUnit_Framework_TestCase
      */
     public function testAddTransitionAndToPlaceIsNotDefined()
     {
-        $places = Place::fromNames(['a', 'b']);
+        $places = $this->createPlaces(['a', 'b']);
 
         new Definition($places, [new Transition('name', $places[0], new Place('c'))]);
+    }
+
+    private function createPlaces($placesName)
+    {
+        $places = [];
+
+        foreach ($placesName as $name) {
+            $places[] = new Place($name);
+        }
+
+        return $places;
     }
 }

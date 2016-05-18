@@ -73,7 +73,6 @@ class GraphvizDumper implements DumperInterface
     {
         $places = array();
 
-        /** @var Place $place */
         foreach ($definition->getPlaces() as $place) {
             $attributes = [];
             if ($place === $definition->getInitialPlace()) {
@@ -153,9 +152,7 @@ class GraphvizDumper implements DumperInterface
     {
         $dotEdges = array();
 
-        /** @var Transition $transition */
         foreach ($definition->getTransitions() as $transition) {
-            /** @var Place $from */
             foreach ($transition->getFroms() as $from) {
                 $dotEdges[] = array(
                     'from' => $from->getName(),
@@ -163,7 +160,6 @@ class GraphvizDumper implements DumperInterface
                     'direction' => 'from',
                 );
             }
-            /** @var Place $to */
             foreach ($transition->getTos() as $to) {
                 $dotEdges[] = array(
                     'from' => $transition->getName(),

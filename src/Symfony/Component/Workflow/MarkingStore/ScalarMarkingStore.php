@@ -31,10 +31,11 @@ class ScalarMarkingStore implements MarkingStoreInterface, UniqueTransitionOutpu
      * @var PropertyAccessorInterface
      */
     private $propertyAccessor;
-    
+
     /**
      * ScalarMarkingStore constructor.
-     * @param string $property
+     *
+     * @param string                         $property
      * @param PropertyAccessorInterface|null $propertyAccessor
      */
     public function __construct($property = 'marking', PropertyAccessorInterface $propertyAccessor = null)
@@ -45,21 +46,22 @@ class ScalarMarkingStore implements MarkingStoreInterface, UniqueTransitionOutpu
 
     /**
      * @param object $subject
+     *
      * @return Marking
      */
     public function getMarking($subject)
     {
-        $place = $this->propertyAccessor->getValue($subject, $this->property);
+        $placeName = $this->propertyAccessor->getValue($subject, $this->property);
 
-        if (!$place) {
+        if (!$placeName) {
             return new Marking();
         }
 
-        return new Marking(array($place => true));
+        return new Marking(array($placeName => 1));
     }
 
     /**
-     * @param object $subject
+     * @param object  $subject
      * @param Marking $marking
      */
     public function setMarking($subject, Marking $marking)

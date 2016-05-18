@@ -38,8 +38,9 @@ class Event extends BaseEvent
 
     /**
      * Event constructor.
-     * @param mixed $subject
-     * @param Marking $marking
+     *
+     * @param mixed      $subject
+     * @param Marking    $marking
      * @param Transition $transition
      */
     public function __construct($subject, Marking $marking, Transition $transition)
