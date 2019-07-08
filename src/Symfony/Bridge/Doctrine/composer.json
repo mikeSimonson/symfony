@@ -21,13 +21,13 @@
         "doctrine/persistence": "~1.0",
         "symfony/polyfill-ctype": "~1.8",
         "symfony/polyfill-mbstring": "~1.0",
-        "symfony/service-contracts": "^1.1"
+        "symfony/service-contracts": "^1.1",
+        "symfony/form": "^4.4|^5.0"
     },
     "require-dev": {
         "symfony/stopwatch": "^4.4|^5.0",
         "symfony/config": "^4.4|^5.0",
         "symfony/dependency-injection": "^4.4|^5.0",
-        "symfony/form": "^4.4|^5.0",
         "symfony/http-kernel": "^4.4|^5.0",
         "symfony/messenger": "^4.4|^5.0",
         "symfony/property-access": "^4.4|^5.0",
